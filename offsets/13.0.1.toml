@@ -1,0 +1,17 @@
+[character-select]
+offset = 0x01_a1_b5_fc
+
+# The combination of the following two replacements causes
+# the GSP tag in the online result screen to never appear.
+
+# Set previous GSP in online result screens to 0
+[results-screen.previous]
+offset = 0x01_d5_a4_40
+expect = [0x80, 0xbe, 0x00, 0xb9] # str w0, [x20, #0xBC]
+replace = [0xe0, 0x03, 0x1f, 0x2a] # mov w0, wzr
+
+# Set new GSP in online result screens to 0
+[results-screen.new]
+offset = 0x01_d5_a4_3c
+expect = [0x00, 0x01, 0x22, 0x1e] # scvtf s0, w8
+replace = [0xe0, 0x03, 0x22, 0x1e] # scvtf s0, wzr
