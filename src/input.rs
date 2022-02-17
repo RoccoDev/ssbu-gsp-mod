@@ -1,4 +1,7 @@
-use skyline::nn::hid::{NpadStyleSet, NpadHandheldState, GetNpadStyleSet, GetNpadHandheldState, GetNpadGcState, GetNpadJoyLeftState, GetNpadJoyRightState, GetNpadFullKeyState};
+use skyline::nn::hid::{
+    GetNpadFullKeyState, GetNpadGcState, GetNpadHandheldState, GetNpadJoyLeftState,
+    GetNpadJoyRightState, GetNpadStyleSet, NpadHandheldState,
+};
 
 macro_rules! has_bit {
     ($flags:expr, $bit:expr) => {
@@ -14,12 +17,12 @@ enum PadStyle {
     LeftJoyconOnly,
     RightJoyconOnly,
     GameCube,
-    Unknown
+    Unknown,
 }
 
 pub struct InputSnapshot {
     style: PadStyle,
-    buttons: u64
+    buttons: u64,
 }
 
 impl InputSnapshot {
@@ -41,18 +44,20 @@ impl InputSnapshot {
         };
 
         let mut state = NpadHandheldState::default();
-        let ptr = &mut state as *mut NpadHandheldState;
-        unsafe { (match style {
+        (match style {
             PadStyle::Handheld => GetNpadHandheldState,
-                PadStyle::GameCube => GetNpadGcState,
-                PadStyle::LeftJoyconOnly => GetNpadJoyLeftState,
-                PadStyle::RightJoyconOnly => GetNpadJoyRightState,
-                _ => GetNpadFullKeyState
-        })(&mut state as *mut NpadHandheldState, &controller_id as *const u32) };
+            PadStyle::GameCube => GetNpadGcState,
+            PadStyle::LeftJoyconOnly => GetNpadJoyLeftState,
+            PadStyle::RightJoyconOnly => GetNpadJoyRightState,
+            _ => GetNpadFullKeyState,
+        })(
+            &mut state as *mut NpadHandheldState,
+            &controller_id as *const u32,
+        );
 
         Self {
             style,
-            buttons: state.Buttons
+            buttons: state.Buttons,
         }
     }
 
@@ -64,7 +69,8 @@ impl InputSnapshot {
             if handheld_style != 0 {
                 (handheld_id, handheld_style)
             } else {
-                (0..8).map(|i| (i, GetNpadStyleSet(&i as *const _).flags))
+                (0..8)
+                    .map(|i| (i, GetNpadStyleSet(&i as *const _).flags))
                     .filter(|&(_, style)| style != 0)
                     .next()
                     .unwrap_or((0, 0))
@@ -75,22 +81,21 @@ impl InputSnapshot {
 
     pub fn is_button_down(&self) -> bool {
         let bit = match self.style {
-            PadStyle::LeftJoyconOnly => 25, // SR (Left JoyCon)
+            PadStyle::LeftJoyconOnly => 25,  // SR (Left JoyCon)
             PadStyle::RightJoyconOnly => 27, // SR (Right JoyCon)
-            _ => 7, // R button on other controllers
+            _ => 7,                          // R button on other controllers
         };
         has_bit!(self.buttons, bit)
     }
 
     pub fn get_input_display(&self) -> &'static [u8] {
         match self.style {
-            PadStyle::ProController 
-                | PadStyle::Handheld 
-                | PadStyle::DualJoycon => b"cmn_button_fill_nx_r\0",
-            PadStyle::LeftJoyconOnly 
-                | PadStyle::RightJoyconOnly => b"cmn_button_fill_nx_sr\0",
+            PadStyle::ProController | PadStyle::Handheld | PadStyle::DualJoycon => {
+                b"cmn_button_fill_nx_r\0"
+            }
+            PadStyle::LeftJoyconOnly | PadStyle::RightJoyconOnly => b"cmn_button_fill_nx_sr\0",
             PadStyle::GameCube => b"cmn_button_gc_r\0",
-            _ => b"cmn_empty\0"
+            _ => b"cmn_empty\0",
         }
     }
 }
