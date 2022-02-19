@@ -23,12 +23,12 @@ struct ResultScreenPatches {
 }
 
 unsafe extern "C" fn gsp_in_online_character_select(inline_ctx: &mut InlineCtx) {
-    let snapshot = InputSnapshot::take_p1();
-    if !snapshot.is_button_down() {
+    let (style, button_down) = InputSnapshot::active_inputs();
+    if !button_down {
         // "R" is not pressed
         // x1 holds the translation key
         let x1 = inline_ctx.registers[1].x.as_mut();
-        *x1 = snapshot.get_input_display().as_ptr() as u64;
+        *x1 = style.get_input_display().as_ptr() as u64;
     }
 }
 

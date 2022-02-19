@@ -10,7 +10,7 @@ macro_rules! has_bit {
 }
 
 #[derive(Debug)]
-enum PadStyle {
+pub enum PadStyle {
     ProController,
     Handheld,
     DualJoycon,
@@ -25,9 +25,9 @@ pub struct InputSnapshot {
     buttons: u64,
 }
 
-impl InputSnapshot {
-    pub unsafe fn take(controller_id: u32, style_flags: u32) -> Self {
-        let style = if has_bit!(style_flags, 0) {
+impl PadStyle {
+    pub fn from_flags(style_flags: u32) -> Self {
+        if has_bit!(style_flags, 0) {
             PadStyle::ProController
         } else if has_bit!(style_flags, 1) {
             PadStyle::Handheld
@@ -41,8 +41,21 @@ impl InputSnapshot {
             PadStyle::GameCube
         } else {
             PadStyle::Unknown
-        };
+        }
+    }
 
+    pub fn get_input_display(self) -> &'static [u8] {
+        match self {
+            PadStyle::LeftJoyconOnly | PadStyle::RightJoyconOnly => b"cmn_button_fill_nx_sr\0",
+            PadStyle::GameCube => b"cmn_button_gc_r\0",
+            _ => b"cmn_button_fill_nx_r\0",
+        }
+    }
+}
+
+impl InputSnapshot {
+    pub unsafe fn take(controller_id: u32, style_flags: u32) -> Self {
+        let style = PadStyle::from_flags(style_flags);
         let mut state = NpadHandheldState::default();
         (match style {
             PadStyle::Handheld => GetNpadHandheldState,
@@ -61,22 +74,27 @@ impl InputSnapshot {
         }
     }
 
-    pub unsafe fn take_p1() -> Self {
-        let (id, style) = {
-            let handheld_id = 0x20;
-            let handheld_style = GetNpadStyleSet(&handheld_id as *const _).flags;
-
-            if handheld_style != 0 {
-                (handheld_id, handheld_style)
-            } else {
-                (0..8)
-                    .map(|i| (i, GetNpadStyleSet(&i as *const _).flags))
-                    .filter(|&(_, style)| style != 0)
-                    .next()
-                    .unwrap_or((0, 0))
-            }
-        };
-        Self::take(id, style)
+    /// Returns whether any controller is inputting the action, and the first
+    /// active controller's style.
+    pub unsafe fn active_inputs() -> (PadStyle, bool) {
+        let (style, has_input) = IntoIterator::into_iter([0..=7, 0x20..=0x20]) // 0x20 = handheld
+            .flatten()
+            .map(|i| (i, GetNpadStyleSet(&i as *const _).flags))
+            .filter(|&(_, style)| style != 0)
+            .fold((None, false), |(style, has_input), (id, new_style)| {
+                let style = match style {
+                    Some(style) => style,
+                    None => new_style,
+                };
+                (
+                    Some(style),
+                    has_input || Self::take(id, new_style).is_button_down(),
+                )
+            });
+        (
+            style.map(PadStyle::from_flags).unwrap_or(PadStyle::Unknown),
+            has_input,
+        )
     }
 
     pub fn is_button_down(&self) -> bool {
@@ -86,16 +104,5 @@ impl InputSnapshot {
             _ => 7,                          // R button on other controllers
         };
         has_bit!(self.buttons, bit)
-    }
-
-    pub fn get_input_display(&self) -> &'static [u8] {
-        match self.style {
-            PadStyle::ProController | PadStyle::Handheld | PadStyle::DualJoycon => {
-                b"cmn_button_fill_nx_r\0"
-            }
-            PadStyle::LeftJoyconOnly | PadStyle::RightJoyconOnly => b"cmn_button_fill_nx_sr\0",
-            PadStyle::GameCube => b"cmn_button_gc_r\0",
-            _ => b"cmn_empty\0",
-        }
     }
 }
