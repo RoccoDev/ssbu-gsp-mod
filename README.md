@@ -15,3 +15,8 @@ You can confirm this by holding `R` in the Quickplay menu, which will reveal you
 * Online modes without GSP (Co-op Quickplay, Tournament, Battle Arenas, Local Wireless)
 * Spectate (including GSP shown in Shared Content)
 * Single-player modes (Classic Mode, All-Star Smash, Home-Run Contest, etc.)
+
+## ARCropolis support
+If ARCropolis is detected (the mod checks for the `romfs/skyline/plugins/libarcropolis.nro` file),
+some strings will be added for the character selection screen.  
+The mod still works without it, instead showing symbols for the buttons to hold.

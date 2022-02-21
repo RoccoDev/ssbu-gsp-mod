@@ -1,6 +1,8 @@
+use std::sync::atomic::Ordering;
+
 use skyline::nn::hid::{
-    GetNpadFullKeyState, GetNpadGcState, GetNpadHandheldState, GetNpadJoyLeftState,
-    GetNpadJoyRightState, GetNpadStyleSet, NpadHandheldState,
+    GetNpadFullKeyState, GetNpadGcState, GetNpadHandheldState, GetNpadJoyDualState,
+    GetNpadJoyLeftState, GetNpadJoyRightState, GetNpadStyleSet, NpadHandheldState,
 };
 
 macro_rules! has_bit {
@@ -45,10 +47,29 @@ impl PadStyle {
     }
 
     pub fn get_input_display(self) -> &'static [u8] {
+        let arc = crate::ARCROPOLIS_LOADED.load(Ordering::SeqCst);
         match self {
-            PadStyle::LeftJoyconOnly | PadStyle::RightJoyconOnly => b"cmn_button_fill_nx_sr\0",
-            PadStyle::GameCube => b"cmn_button_gc_r\0",
-            _ => b"cmn_button_fill_nx_r\0",
+            PadStyle::LeftJoyconOnly | PadStyle::RightJoyconOnly => {
+                if arc {
+                    b"cmn_gsp_sr\0"
+                } else {
+                    b"cmn_button_fill_nx_sr\0"
+                }
+            }
+            PadStyle::GameCube => {
+                if arc {
+                    b"cmn_gsp_gc\0"
+                } else {
+                    b"cmn_button_gc_r\0"
+                }
+            }
+            _ => {
+                if arc {
+                    b"cmn_gsp_nx\0"
+                } else {
+                    b"cmn_button_fill_nx_r\0"
+                }
+            }
         }
     }
 }
@@ -62,6 +83,7 @@ impl InputSnapshot {
             PadStyle::GameCube => GetNpadGcState,
             PadStyle::LeftJoyconOnly => GetNpadJoyLeftState,
             PadStyle::RightJoyconOnly => GetNpadJoyRightState,
+            PadStyle::DualJoycon => GetNpadJoyDualState,
             _ => GetNpadFullKeyState,
         })(
             &mut state as *mut NpadHandheldState,
